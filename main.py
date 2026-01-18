@@ -173,26 +173,40 @@ def fetch_missing_description(url: str, proxies: dict = None) -> str:
 def get_jobs_data():
     """
     Scrape job listings by JobSpy.
+
+    Add Retry logic if needed.
     """
     proxies = [PROXY_URL] if PROXY_URL else None
     print(f"🕵️  CareerScout is searching for '{SEARCH_TERM}' in '{LOCATION}'...")
     print(f"🔌  Proxy: {proxies[0] if proxies else 'None'}")
 
-    try:
-        jobs = scrape_jobs(
-            site_name=["linkedin"],
-            search_term=SEARCH_TERM,
-            location=LOCATION,
-            result_wanted=RESULT_LIMIT,
-            hours_old=HOURS_OLD,
-            proxies=proxies
-        )
+    MAX_RETRIES = 5
 
-        print(f"✅  Scraped {len(jobs)} jobs.")
-        return jobs
-    except Exception as e:
-        print(f"❌  Error during job scraping: {str(e)}")
-        return pd.DataFrame()
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            print(f"   🔄 Attempt {attempt} of {MAX_RETRIES}...")
+            jobs = scrape_jobs(
+                site_name=["linkedin"],
+                search_term=SEARCH_TERM,
+                location=LOCATION,
+                result_wanted=RESULT_LIMIT,
+                hours_old=HOURS_OLD,
+                proxies=proxies
+            )
+
+            print(f"✅  Scraped {len(jobs)} jobs.")
+            return jobs
+        except Exception as e:
+            print(f"     ❌  Error on attempt {attempt}: {str(e)}")
+            print(f"❌  Error during job scraping: {str(e)}")
+
+            if attempt > MAX_RETRIES:
+                wait_time = random.uniform(3, 6)
+                print(f"   ⏳ Waiting for {wait_time:.2f} seconds before retrying...")
+                time.sleep(wait_time)
+            else:
+                print("All retry attempts failed. Exiting scraping process.")
+    return pd.DataFrame()
 
 
 def evaluate_job(title: str, description: str) -> dict:
@@ -306,7 +320,6 @@ def main():
         if not description or len(str(description)) < 50:
             if job_url:
                 description = fetch_missing_description(job_url, proxies=req_proxies)
-            print(description)
 
         if not description or len(str(description)) < 50:
             print(f"   ⚠️  Skipping '{title}' due to insufficient description.")
