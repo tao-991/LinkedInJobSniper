@@ -1,3 +1,4 @@
+import glob
 import os
 import smtplib
 from typing import List, Optional
@@ -21,12 +22,14 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+# read pdf
+from pypdf import PdfReader
+
 
 # Load environment variables
 load_dotenv()
 
 # Configuration
-RESUME = os.getenv("RESUME_TEXT", "")
 SEARCH_TERM = "Software Engineer"
 LOCATION = "Tokyo, Japan"
 RESULT_LIMIT = 10
@@ -73,6 +76,54 @@ prompt_template = ChatPromptTemplate.from_messages([
 
 # Chain
 evaluation_chain = prompt_template | structured_llm
+
+
+# Read resume
+def load_resume_from_file():
+    """
+    read resume from 'resumes/'
+    support .pdf .txt .md
+    """
+
+    resume_folder = "resumes"
+
+    if not os.path.exists(resume_folder):
+        os.makedirs(resume_folder)
+        print("📁 Created 'resumes' folder. Please add your resume PDF there and restart.")
+        return ""
+
+    # find file
+    files = glob.glob(os.path.join(resume_folder,"*"))
+
+    if not files:
+        print("📁 No resume file found in 'resumes' folder. Please add your resume PDF there and restart.")
+        return ""
+
+    # Use the first file found
+    file_path = files[0]
+    file_ext = os.path.splitext(file_path)[1].lower()
+    content = ""
+
+    print(f'📄 Loading resume from: {file_path}')
+
+    try:
+        if file_ext == ".pdf":
+            reader = PdfReader(file_path)
+            for page in reader.pages:
+                content += page.extract_text() + "\n" or ""
+        elif file_ext in ['.txt', '.md']:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            print("❌ Unsupported resume file format. Please use PDF, TXT, or MD.")
+            return ""
+
+        return content
+    except Exception as e:
+        print(f"❌ Error reading resume file: {e}")
+        return ""
+
+RESUME = load_resume_from_file()
 
 # web clawling functions
 def fetch_missing_description(url: str, proxies: dict = None) -> str:
@@ -237,6 +288,9 @@ def main():
     if df.empty:
         return
 
+    # leave 3 jobs for testing
+    df = df.head(3)
+
     scored_jobs = []
 
     req_proxies = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
@@ -275,7 +329,7 @@ def main():
         scored_jobs.sort(key=lambda x: x['score'], reverse=True)
         top_10 = scored_jobs[:10]
 
-        send_email(top_10)
+    send_email(top_10)
 
 if __name__ == "__main__":
     main()

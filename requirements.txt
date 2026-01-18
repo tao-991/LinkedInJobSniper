@@ -9,3 +9,4 @@ langchain_openai
 pydantic
 bs4
 fake_useragent
+pypdf
