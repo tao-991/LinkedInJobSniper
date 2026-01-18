@@ -30,7 +30,7 @@ from pypdf import PdfReader
 load_dotenv()
 
 # Configuration
-SEARCH_TERM = "Software Engineer"
+SEARCH_TERM = "Software Engineer (Python, Java)"
 LOCATION = "Tokyo, Japan"
 RESULT_LIMIT = 10
 HOURS_OLD = 24
@@ -61,10 +61,26 @@ llm = ChatOpenAI(
 # structure output
 structured_llm = llm.with_structured_output(JobEvaluation)
 
+# system template
+system_template = """
+[Context]
+You are an expert tech career coach. Your goal is to evaluate how well a job description matches a candidate's resume and preferences.
+
+[Objectives]
+Return a score by the following criteria and also give a concise, one-sentence reason for the score.
+
+[Criteria]
+1. Skill Match (50%): How well do the required skills and technologies in the job description align with those listed on the resume? (Programming Languages, Frameworks, Tools, etc,)
+2. Experience Relevance (20%): Does the candidate's past work experience relate to the job responsibilities? Candidate's years of experience can be 1-2 years different from the job requirement, which wont affect the score.
+3. If the job description emphasizes AI related skills, give extra points.
+4. International public listed companies are preferred, give extra points.
+5. Python is better than Java for our candidate, give extra points if Python is required or mentioned.
+"""
+
 # Prompt template
 prompt_template = ChatPromptTemplate.from_messages([
     ("system",
-     "You are an expert tech career coach. Your goal is to evaluate how well a job description matches a candidate's resume."),
+     system_template),
     ("user", """
     RESUME (Truncated):
     {resume}
