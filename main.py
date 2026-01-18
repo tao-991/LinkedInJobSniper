@@ -5,6 +5,13 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# web clawling imports if needed
+import requests
+from bs4 import BeautifulSoup
+from fake_useragent import UserAgent
+import time
+import random
+
 import pandas as pd
 from dotenv import load_dotenv
 from jobspy import scrape_jobs
@@ -41,7 +48,7 @@ llm = ChatOpenAI(
     model_name="gpt-4o-mini",
     temperature=0,
     api_key=os.getenv("API_KEY"),
-    api_base=os.getenv("API_BASE"),
+    base_url=os.getenv("API_BASE"),
 )
 
 
@@ -66,6 +73,50 @@ prompt_template = ChatPromptTemplate.from_messages([
 
 # Chain
 evaluation_chain = prompt_template | structured_llm
+
+# web clawling functions
+def fetch_missing_description(url: str, proxies: dict = None) -> str:
+    """
+    if the jobspy cannot fetch description, try to fetch from job url directly.
+    -- For LinkedIn jobs only for now.
+    """
+    print(f"   ⛑️  Attempting manual fetch for: {url[:40]}...")
+
+    # Set up headers
+    ua = UserAgent()
+    headers = {
+        "User-Agent": ua.random,
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referrer": "https://www.google.com/"
+    }
+
+    try:
+        # random sleep to mimic human behavior
+        time.sleep(random.uniform(2, 5))
+
+        # transfer the proxy to requests format (dictonary)
+        proxies_dict = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
+
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
+
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            description_div = soup.find("div", {"class": "show-more-less-html__markup"}) or \
+                              soup.find("div", {"class": "description__text"}) or \
+                              soup.find("div", {"class": "job-description"})
+
+            if description_div:
+                text = description_div.get_text(separator="\n").strip()
+                return text
+            else:
+                return soup.get_text()[:5000]
+        else:
+            print(f"     ❌  Failed to fetch page, status code: {response.status_code}")
+            return ""
+    except Exception as e:
+        print(f"     ❌  Exception during manual fetch: {str(e)}")
+        return ""
 
 # scrape jobs
 def get_jobs_data():
@@ -186,18 +237,31 @@ def main():
     if df.empty:
         return
 
-    print(df)
-
     scored_jobs = []
+
+    req_proxies = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 
     # 2. Evaluation Loop
     print(f"🧠  Analyzing {len(df)} jobs with AI...")
 
     for _, row in df.iterrows():
         title = row.get('title', 'Unknown')
-        # Simple filtering
+        description = row.get('description')
+        job_url = row.get('job_url')
 
-        evaluation = evaluate_job(title, row.get('description', ''))
+        if not description or len(str(description)) < 50:
+            if job_url:
+                description = fetch_missing_description(job_url, proxies=req_proxies)
+            print(description)
+
+        if not description or len(str(description)) < 50:
+            print(f"   ⚠️  Skipping '{title}' due to insufficient description.")
+            continue
+
+        evaluation = evaluate_job(title, description)
+
+        print()
+        print(f"   📝 '{title}' scored {evaluation['score']}: {evaluation['reason']}")
 
         if evaluation['score'] >= 60:  # 阈值过滤
             scored_jobs.append({
