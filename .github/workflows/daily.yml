@@ -3,9 +3,9 @@ name: Daily Career Scout
 # Triggers
 on:
   schedule:
-    # Schedule: Runs at 00:00 UTC daily
-    # (Equals 08:00 AM Singapore/Beijing Time due to UTC+8)
-    - cron: '0 0 * * *'
+    # Schedule: Runs at 02:00 UTC daily
+    # (Equals 10:00 AM Singapore/Beijing Time due to UTC+8)
+    - cron: '0 2 * * *'
   # Allows manual triggering via the 'Run workflow' button (for testing)
   workflow_dispatch:
 
@@ -43,4 +43,5 @@ jobs:
           EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
           PROXY_URL: ${{ secrets.PROXY_URL }}
           RESUME_TEXT: ${{ secrets.RESUME_TEXT }}
+          CRITERIA: ${{ secrets.CRITERIA }}
         run: python main.py
