@@ -143,9 +143,8 @@ def load_resume_from_google_drive() -> str:
         print(f"❌  Failed to load resume from Google Drive: {e}")
         return None
 
-if RESUME is None:
+if not RESUME:
     RESUME = load_resume_from_google_drive()
-    print(RESUME)
 
 # web clawling functions
 def fetch_missing_description(url: str, proxies: dict = None) -> str:

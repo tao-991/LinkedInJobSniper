@@ -44,4 +44,6 @@ jobs:
           PROXY_URL: ${{ secrets.PROXY_URL }}
           RESUME_TEXT: ${{ secrets.RESUME_TEXT }}
           CRITERIA: ${{ secrets.CRITERIA }}
+          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+          RESUME_FILE_ID: ${{ secrets.RESUME_FILE_ID }}
         run: python main.py
