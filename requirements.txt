@@ -14,3 +14,8 @@ langchain-community>=0.0.10
 langchain-openai>=0.0.5
 requests
 beautifulsoup4
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+pypdf

@@ -5,6 +5,11 @@ from typing import List, Optional
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import json
+import io
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 # web clawing imports if needed
 import requests
@@ -24,6 +29,7 @@ from pydantic import BaseModel, Field
 
 # read pdf
 from pypdf import PdfReader
+
 
 
 # Load environment variables
@@ -98,53 +104,48 @@ prompt_template = ChatPromptTemplate.from_messages([
 evaluation_chain = prompt_template | structured_llm
 
 
-# Read resume
-def load_resume_from_file():
-    """
-    read resume from 'resumes/'
-    support .pdf .txt .md
-    """
+# Read resume from Google Drive
+def load_resume_from_google_drive() -> str:
+    # retrive config
+    creds_json_str = os.getenv("GCP_CREDENTIALS_JSON")
+    file_id = os.getenv("RESUME_FILE_ID")
 
-    resume_folder = "resumes"
+    if not creds_json_str or not file_id:
+        print("❌  Google Drive credentials or file ID not provided.")
+        return None
 
-    if not os.path.exists(resume_folder):
-        os.makedirs(resume_folder)
-        print("📁 Created 'resumes' folder. Please add your resume PDF there and restart.")
-        return ""
-
-    # find file
-    files = glob.glob(os.path.join(resume_folder,"*"))
-
-    if not files:
-        print("📁 No resume file found in 'resumes' folder. Please add your resume PDF there and restart.")
-        return ""
-
-    # Use the first file found
-    file_path = files[0]
-    file_ext = os.path.splitext(file_path)[1].lower()
-    content = ""
-
-    print(f'📄 Loading resume from: {file_path}')
+    print("🔐  Loading resume from Google Drive...")
 
     try:
-        if file_ext == ".pdf":
-            reader = PdfReader(file_path)
-            for page in reader.pages:
-                content += page.extract_text() + "\n" or ""
-        elif file_ext in ['.txt', '.md']:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        else:
-            print("❌ Unsupported resume file format. Please use PDF, TXT, or MD.")
-            return ""
+        creds_dict = json.loads(creds_json_str)
+        creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive.readonly"])
 
-        return content
+        service = build('drive', 'v3', credentials=creds)
+
+        requests = service.files().get_media(fileId=file_id)
+        file_io = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_io, requests)
+
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            print(f"   ⬇️  Downloading... {int(status.progress() * 100)}%")
+
+        file_io.seek(0)
+        reader = PdfReader(file_io)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+
+        print("✅  Resume loaded successfully from Google Drive.")
+        return text
     except Exception as e:
-        print(f"❌ Error reading resume file: {e}")
-        return ""
+        print(f"❌  Failed to load resume from Google Drive: {e}")
+        return None
 
 if RESUME is None:
-    RESUME = load_resume_from_file()
+    RESUME = load_resume_from_google_drive()
+    print(RESUME)
 
 # web clawling functions
 def fetch_missing_description(url: str, proxies: dict = None) -> str:
