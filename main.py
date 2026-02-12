@@ -37,7 +37,7 @@ load_dotenv()
 
 # Configuration
 SEARCH_TERM = "Software Engineer (Python, Java)"
-LOCATIONS = ["Tokyo, Japan", "Shanghai, China", "Hongkong, China"]
+LOCATIONS = ["Tokyo, Japan", "Hongkong, China", "Singapore"]
 RESULT_LIMIT = 15
 HOURS_OLD = 24
 PROXY_URL = os.getenv("PROXY_URL", None)
@@ -54,6 +54,7 @@ class JobEvaluation(BaseModel):
 
     score: int = Field(description="A relevance score from 0 to 100 based on the resume match and job preferences.")
     reason: str = Field(description="A concise, one-sentence reason for the score.")
+    yoe: str = Field(description="Years of Experience required for the job mentioned in job description.")
 
 
 # AI model
@@ -74,7 +75,10 @@ system_template = """
 You are an expert tech career coach. Your goal is to evaluate how well a job description matches a candidate's resume and preferences.
 
 [Objectives]
-Return a score by the following criteria and also give a concise, one-sentence reason for the score.
+Return a score by the following criteria, the years of experiences required for the job mentioned in job description and also give a concise, one-sentence reason for the score.
+
+[Constraints]
+The years of experience should be extracted from the job description. If not mentioned, return "Not Specified".
 
 [Criteria]
 1. Skill Match (50%): How well do the required skills and technologies in the job description align with those listed on the resume? (Programming Languages, Frameworks, Tools, etc,)
@@ -233,7 +237,7 @@ def get_jobs_data(location: str) -> pd.DataFrame:
 def evaluate_job(title: str, description: str) -> dict:
     """Using Langchain to evaluate a job posting against the resume."""
     if not description or len(str(description)) < 50:
-        return {"score": 0, "reason": "Job description too short or missing"}
+        return {"score": 0, "reason": "Job description too short or missing", "yoe": "Not Specified"}
 
     try:
         # 调用 Chain
@@ -242,11 +246,11 @@ def evaluate_job(title: str, description: str) -> dict:
             "title": title,
             "description": description[:3000]
         })
-        return {"score": result.score, "reason": result.reason}
+        return {"score": result.score, "reason": result.reason, "yoe": result.yoe}
 
     except Exception as e:
         print(f"⚠️  AI Evaluation Error for '{title}': {e}")
-        return {"score": 0, "reason": "AI Error"}
+        return {"score": 0, "reason": "AI Error", "yoe": "AI Error"}
 
 def send_email(top_jobs: List[dict]):
     if not top_jobs:
@@ -270,6 +274,7 @@ def send_email(top_jobs: List[dict]):
                     <th style="padding: 10px; border-bottom: 2px solid #ddd;">Score</th>
                     <th style="padding: 10px; border-bottom: 2px solid #ddd;">Title</th>
                     <th style="padding: 10px; border-bottom: 2px solid #ddd;">Company</th>
+                    <th style="padding: 10px; border-bottom: 2px solid #ddd;">Years of Experience</th>
                     <th style="padding: 10px; border-bottom: 2px solid #ddd;">Why Match?</th>
                     <th style="padding: 10px; border-bottom: 2px solid #ddd;">Action</th>
                 </tr>
@@ -284,6 +289,7 @@ def send_email(top_jobs: List[dict]):
                     </td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">{job['title']}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">{job['company']}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{job['yoe']}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; color: #555;">
                         {job['reason']}
                     </td>
@@ -359,7 +365,8 @@ def main():
                 "company": row.get('company'),
                 "job_url": row.get('job_url'),
                 "score": evaluation['score'],
-                "reason": evaluation['reason']
+                "reason": evaluation['reason'],
+                "yoe": evaluation['yoe']
             })
         # 3. Sorting & Sending
         scored_jobs.sort(key=lambda x: x['score'], reverse=True)
