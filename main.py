@@ -55,7 +55,7 @@ class JobEvaluation(BaseModel):
 
     score: int = Field(description="A relevance score from 0 to 100 based on the resume match and job preferences.")
     reason: str = Field(description="A concise, one-sentence reason for the score.")
-    yoe: str = Field(description="Years of Experience required for the job mentioned in job description.")
+    yoe: str = Field(description='Years of Experience required, extracted verbatim from the job description. Look for patterns like "X+ years", "X-Y years", "minimum X years of experience", "at least X years". Return the exact phrase found (e.g., "3+ years", "5-7 years"). If not found anywhere in the description, return "Not Specified".')
 
 
 # AI model
@@ -79,7 +79,14 @@ You are an expert tech career coach. Your goal is to evaluate how well a job des
 Return a score by the following criteria, the years of experiences required for the job mentioned in job description and also give a concise, one-sentence reason for the score.
 
 [Constraints]
-The years of experience should be extracted from the job description. If not mentioned, return "Not Specified".
+For the YOE field, scan the ENTIRE job description for experience requirements. Common patterns to find:
+- "X+ years of experience"
+- "X to Y years"
+- "minimum X years"
+- "at least X years"
+- "X years of relevant experience"
+- Japanese patterns: "X年以上" or "X年〜Y年"
+Extract the exact phrase. Only return "Not Specified" if no experience requirement exists anywhere in the description.
 
 [Criteria]
 1. Skill Match (50%): How well do the required skills and technologies in the job description align with those listed on the resume? (Programming Languages, Frameworks, Tools, etc,)
@@ -245,7 +252,7 @@ def evaluate_job(title: str, description: str) -> dict:
         result: JobEvaluation = evaluation_chain.invoke({
             "resume": RESUME[:3000],  # save token
             "title": title,
-            "description": description[:3000]
+            "description": description[:2000] + "\n...\n" + description[-1000:] if len(description) > 3000 else description
         })
         return {"score": result.score, "reason": result.reason, "yoe": result.yoe}
 
@@ -333,6 +340,9 @@ def main():
     if df.empty:
         return
 
+    df = df.drop_duplicates(subset=['job_url'], keep='first').reset_index(drop=True)
+    print(f"🔍  {len(df)} unique jobs after deduplication.")
+
     # # leave 3 jobs for testing
     # df = df.head(3)
 
@@ -370,10 +380,10 @@ def main():
                 "reason": evaluation['reason'],
                 "yoe": evaluation['yoe']
             })
-        # 3. Sorting & Sending
-        scored_jobs.sort(key=lambda x: x['score'], reverse=True)
-        top_15 = scored_jobs[:15]
 
+    # 3. Sorting & Sending
+    scored_jobs.sort(key=lambda x: x['score'], reverse=True)
+    top_15 = scored_jobs[:15]
     send_email(top_15)
 
 if __name__ == "__main__":
