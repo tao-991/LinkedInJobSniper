@@ -222,7 +222,7 @@ def get_jobs_data(location: str, search_term: str) -> pd.DataFrame:
                 site_name=["linkedin"],
                 search_term=search_term,
                 location=location,
-                result_wanted=RESULT_LIMIT,
+                results_wanted=RESULT_LIMIT,
                 hours_old=HOURS_OLD,
                 proxies=proxies
             )
