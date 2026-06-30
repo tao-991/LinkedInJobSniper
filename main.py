@@ -36,7 +36,7 @@ from pypdf import PdfReader
 load_dotenv()
 
 # Configuration
-SEARCH_TERMS = ["Data Engineer", "Software Developer at Fintech"]
+SEARCH_TERMS = ["Execution Algo Trading Developer", "Trading System Java", "Investment Banking"]
 # SEARCH_TERM = "Software Engineer (Python, Java)"
 LOCATIONS = ["Shenzhen", "Hongkong", "Shanghai"]
 RESULT_LIMIT = 15
@@ -60,7 +60,7 @@ class JobEvaluation(BaseModel):
 
 # AI model
 llm = ChatOpenAI(
-    model_name="gemini-3-flash-preview",
+    model_name="deepseek-v4-pro",
     temperature=0,
     api_key=API_KEY,
     base_url=BASE_URL,
