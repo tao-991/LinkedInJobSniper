@@ -32,14 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ↓↓↓ 临时调试：确认代理在 Actions 里能不能通 ↓↓↓
-      - name: Debug proxy
-        env:
-          PROXY_URL: ${{ secrets.PROXY_URL }}
-        run: |
-          echo "PROXY_URL length = ${#PROXY_URL}"
-          curl -v -x "$PROXY_URL" https://api.ipify.org --max-time 30 || echo "=== proxy test failed ==="
-      # ↑↑↑ 调试好了之后可以把这一整步删掉 ↑↑↑
+      
 
       # 4. Run the main script
       - name: Run Job Agent
