@@ -60,7 +60,7 @@ class JobEvaluation(BaseModel):
 
 # AI model
 llm = ChatOpenAI(
-    model_name="deepseek-v4-pro",
+    model_name="gpt-5.4",
     temperature=0,
     api_key=API_KEY,
     base_url=BASE_URL,
